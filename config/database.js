@@ -23,6 +23,10 @@ const poolConfig = {
   password: process.env.DB_PASSWORD,
   // Asegurar que la conexión use UTF-8
   client_encoding: 'UTF8',
+  // Forzar IPv4 para evitar problemas de conectividad
+  family: 4,
+  // Timeout de conexión
+  connectionTimeoutMillis: 10000,
 };
 
 // SSL solo si es necesario (para Supabase o bases de datos remotas)
