@@ -21,7 +21,17 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middleware
-app.use(cors());
+// Configurar CORS para permitir requests desde Vercel y localhost
+const corsOptions = {
+  origin: [
+    'http://localhost:5173', // Desarrollo local
+    'https://sirgm-web.vercel.app', // Producción Vercel (se actualizará automáticamente)
+    /https:\/\/.*\.vercel\.app$/, // Cualquier subdominio de Vercel
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(utf8Handler); // Asegurar UTF-8 en todas las respuestas
 
 app.use(express.json({ limit: '10mb' }));
