@@ -3,15 +3,29 @@ require('dotenv').config();
 
 // Verificar que las variables de entorno estén definidas
 const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName].trim() === '');
 
 if (missingVars.length > 0) {
   console.error('❌ ERROR: Faltan variables de entorno requeridas:');
   missingVars.forEach(varName => {
     console.error(`   - ${varName}`);
   });
-  console.error('\n💡 Solución: Crea un archivo .env en la raíz del proyecto con las variables necesarias.');
-  console.error('   Consulta VERIFICAR_CONFIG.md para más información.\n');
+  console.error('\n💡 Solución: Configura las variables de entorno en Render:');
+  console.error('   1. Ve a Render Dashboard → Tu servicio → Settings → Environment');
+  console.error('   2. Agrega todas las variables requeridas');
+  console.error('   3. Consulta VERIFICAR_CONFIG.md para más información.\n');
+  
+  // Mostrar qué valores tienen las variables (sin mostrar passwords completos)
+  console.error('📋 Variables actuales:');
+  requiredEnvVars.forEach(varName => {
+    const value = process.env[varName];
+    if (varName === 'DB_PASSWORD') {
+      console.error(`   ${varName}: ${value ? '***configurada***' : '❌ NO CONFIGURADA'}`);
+    } else {
+      console.error(`   ${varName}: ${value || '❌ NO CONFIGURADA'}`);
+    }
+  });
+  console.error('');
 }
 
 // Configuración del pool
