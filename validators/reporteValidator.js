@@ -35,7 +35,22 @@ const updateEstadoValidator = [
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Las observaciones no pueden exceder 1000 caracteres')
+    .withMessage('Las observaciones no pueden exceder 1000 caracteres'),
+  body('prioridad')
+    .optional()
+    .isIn(['baja', 'media', 'alta', 'urgente'])
+    .withMessage('La prioridad debe ser: baja, media, alta o urgente')
+];
+
+const updatePrioridadValidator = [
+  param('id')
+    .isInt()
+    .withMessage('El ID debe ser un número entero'),
+  body('prioridad')
+    .notEmpty()
+    .withMessage('La prioridad es requerida')
+    .isIn(['baja', 'media', 'alta', 'urgente'])
+    .withMessage('La prioridad debe ser: baja, media, alta o urgente')
 ];
 
 const getReporteValidator = [
@@ -82,6 +97,7 @@ const deleteReporteValidator = [
 module.exports = {
   createReporteValidator,
   updateEstadoValidator,
+  updatePrioridadValidator,
   getReporteValidator,
   updateReporteValidator,
   deleteReporteValidator

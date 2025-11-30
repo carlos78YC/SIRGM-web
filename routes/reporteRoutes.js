@@ -4,7 +4,8 @@ const reporteController = require('../controllers/reporteController');
 const { authenticate } = require('../middleware/auth');
 const { 
   createReporteValidator, 
-  updateEstadoValidator, 
+  updateEstadoValidator,
+  updatePrioridadValidator,
   getReporteValidator,
   updateReporteValidator,
   deleteReporteValidator
@@ -50,6 +51,14 @@ router.put(
   updateEstadoValidator,
   handleValidationErrors,
   reporteController.updateEstado
+);
+
+// PUT /reportes/:id/prioridad - Establecer prioridad del reporte
+router.put(
+  '/:id/prioridad',
+  updatePrioridadValidator,
+  handleValidationErrors,
+  reporteController.updatePrioridad
 );
 
 // DELETE /reportes/:id - Eliminar reporte

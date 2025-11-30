@@ -27,16 +27,33 @@ const createReporte = async (req, res, next) => {
       }
     }
 
-    // Crear reporte
+    // IMPORTANTE: La app móvil NO envía prioridad
+    // Si prioridad viene como undefined, null, o string vacío, NO enviarla al modelo
+    // El modelo la convertirá a NULL explícitamente
+    let prioridadValue = undefined;
+    if (prioridad !== undefined && prioridad !== null && prioridad !== '') {
+      // Solo asignar si viene un valor válido (desde la web, por ejemplo)
+      prioridadValue = prioridad;
+    }
+    
+    // Debug: Ver qué valor de prioridad estamos recibiendo
+    console.log('[DEBUG createReporte] prioridad recibida:', prioridad);
+    console.log('[DEBUG createReporte] prioridadValue:', prioridadValue);
+    console.log('[DEBUG createReporte] tipo de prioridad:', typeof prioridad);
+
+    // Crear reporte - prioridad será NULL si no se proporciona
     const reporte = await Reporte.create({
       usuario_id,
       titulo,
       descripcion,
       ubicacion,
-      prioridad,
+      prioridad: prioridadValue, // undefined si no viene, el modelo lo convertirá a NULL
       foto_url,
       foto_path
     });
+    
+    // Debug: Ver qué prioridad se guardó
+    console.log('[DEBUG createReporte] Reporte creado con prioridad:', reporte.prioridad);
 
     res.status(201).json({
       success: true,
@@ -112,7 +129,7 @@ const getReporteById = async (req, res, next) => {
 const updateEstado = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { estado, observaciones } = req.body;
+    const { estado, observaciones, prioridad } = req.body;
 
     // Verificar que el reporte existe
     const reporte = await Reporte.findById(id);
@@ -131,8 +148,17 @@ const updateEstado = async (req, res, next) => {
       });
     }
 
-    // Actualizar estado
-    const reporteActualizado = await Reporte.updateEstado(id, estado, observaciones);
+    // Si el reporte no tiene prioridad, se requiere establecerla
+    if (!reporte.prioridad && !prioridad) {
+      return res.status(400).json({
+        success: false,
+        message: 'Este reporte requiere que se establezca una prioridad antes de actualizar el estado',
+        requiresPrioridad: true
+      });
+    }
+
+    // Actualizar estado (y prioridad si se proporciona)
+    const reporteActualizado = await Reporte.updateEstado(id, estado, observaciones, prioridad);
 
     res.json({
       success: true,
@@ -140,6 +166,62 @@ const updateEstado = async (req, res, next) => {
       data: reporteActualizado
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+const updatePrioridad = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { prioridad } = req.body;
+
+    console.log('[DEBUG updatePrioridad] ID:', id);
+    console.log('[DEBUG updatePrioridad] Prioridad recibida:', prioridad);
+    console.log('[DEBUG updatePrioridad] Usuario rol:', req.user?.rol);
+
+    // Verificar que el reporte existe
+    const reporte = await Reporte.findById(id);
+    if (!reporte) {
+      console.log('[DEBUG updatePrioridad] Reporte no encontrado');
+      return res.status(404).json({
+        success: false,
+        message: 'Reporte no encontrado'
+      });
+    }
+
+    console.log('[DEBUG updatePrioridad] Reporte encontrado, prioridad actual:', reporte.prioridad);
+
+    // Verificar permisos: solo admin y mantenimiento pueden establecer prioridad
+    if (req.user.rol !== 'admin' && req.user.rol !== 'mantenimiento') {
+      console.log('[DEBUG updatePrioridad] Sin permisos, rol:', req.user.rol);
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para establecer la prioridad del reporte'
+      });
+    }
+
+    // Validar que prioridad sea válida
+    if (!prioridad || !['baja', 'media', 'alta', 'urgente'].includes(prioridad)) {
+      console.log('[DEBUG updatePrioridad] Prioridad inválida:', prioridad);
+      return res.status(400).json({
+        success: false,
+        message: 'La prioridad debe ser: baja, media, alta o urgente'
+      });
+    }
+
+    // Actualizar prioridad
+    console.log('[DEBUG updatePrioridad] Actualizando prioridad a:', prioridad);
+    const reporteActualizado = await Reporte.updatePrioridad(id, prioridad);
+    console.log('[DEBUG updatePrioridad] Prioridad actualizada, nueva prioridad:', reporteActualizado?.prioridad);
+
+    res.json({
+      success: true,
+      message: 'Prioridad del reporte actualizada exitosamente',
+      data: reporteActualizado
+    });
+  } catch (error) {
+    console.error('[DEBUG updatePrioridad] Error:', error.message);
+    console.error('[DEBUG updatePrioridad] Stack:', error.stack);
     next(error);
   }
 };
@@ -158,8 +240,9 @@ const updateReporte = async (req, res, next) => {
       });
     }
 
-    // Verificar permisos: solo el dueño o admin pueden actualizar
-    if (req.user.rol !== 'admin' && reporte.usuario_id !== req.user.id) {
+    // Verificar permisos: solo el dueño, admin o mantenimiento pueden actualizar
+    // El personal de mantenimiento puede actualizar cualquier reporte (especialmente prioridad)
+    if (req.user.rol !== 'admin' && req.user.rol !== 'mantenimiento' && reporte.usuario_id !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para actualizar este reporte'
@@ -259,6 +342,7 @@ module.exports = {
   getReportes,
   getReporteById,
   updateEstado,
+  updatePrioridad,
   updateReporte,
   deleteReporte
 };

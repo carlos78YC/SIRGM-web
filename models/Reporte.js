@@ -10,15 +10,31 @@ class Reporte {
       RETURNING *
     `;
     
+    // Asegurar que prioridad sea null si no se proporciona
+    // La app móvil NO envía prioridad, así que será undefined
+    // Convertir explícitamente a NULL para que la base de datos no use ningún DEFAULT
+    let prioridadValue = null;
+    if (prioridad !== undefined && prioridad !== null && prioridad !== '') {
+      // Solo asignar si viene un valor válido y no vacío
+      prioridadValue = prioridad;
+    }
+    
+    // Debug: Ver qué valor vamos a insertar
+    console.log('[DEBUG Reporte.create] prioridad recibida:', prioridad);
+    console.log('[DEBUG Reporte.create] prioridadValue a insertar:', prioridadValue);
+    
     const result = await pool.query(query, [
       usuario_id,
       titulo,
       descripcion,
       ubicacion || null,
-      prioridad || 'media',
+      prioridadValue, // NULL si no se proporciona - debe ser establecida por mantenimiento
       foto_url || null,
       foto_path || null
     ]);
+    
+    // Debug: Ver qué se insertó
+    console.log('[DEBUG Reporte.create] Prioridad insertada:', result.rows[0]?.prioridad);
     
     return result.rows[0];
   }
@@ -85,7 +101,7 @@ class Reporte {
     return result.rows[0];
   }
 
-  static async updateEstado(id, estado, observaciones = null) {
+  static async updateEstado(id, estado, observaciones = null, prioridad = null) {
     const updates = [];
     const values = [];
     let paramCount = 1;
@@ -96,6 +112,12 @@ class Reporte {
     if (observaciones) {
       updates.push(`observaciones = $${paramCount++}`);
       values.push(observaciones);
+    }
+
+    // Si se proporciona prioridad, actualizarla
+    if (prioridad) {
+      updates.push(`prioridad = $${paramCount++}`);
+      values.push(prioridad);
     }
 
     if (estado === 'cerrado') {
@@ -113,6 +135,18 @@ class Reporte {
     `;
 
     const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+
+  static async updatePrioridad(id, prioridad) {
+    const query = `
+      UPDATE reportes 
+      SET prioridad = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [prioridad, id]);
     return result.rows[0];
   }
 
@@ -172,6 +206,8 @@ class Reporte {
 }
 
 module.exports = Reporte;
+
+
 
 
 
