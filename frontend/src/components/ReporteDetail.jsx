@@ -62,18 +62,25 @@ const ReporteDetail = () => {
   };
 
   const handleUpdatePrioridad = async () => {
-    if (!nuevaPrioridad) return;
+    if (!nuevaPrioridad) {
+      setError('Por favor selecciona una prioridad');
+      return;
+    }
 
     try {
       setUpdating(true);
-      await reporteService.updatePrioridad(id, nuevaPrioridad);
+      setError('');
+      const response = await reporteService.updatePrioridad(id, nuevaPrioridad);
       await loadReporte();
       setShowPrioridadModal(false);
       setNuevaPrioridad('');
       setError('');
     } catch (err) {
-      setError('Error al actualizar la prioridad');
-      console.error(err);
+      console.error('Error completo:', err);
+      console.error('Error response:', err.response);
+      const errorMessage = err.response?.data?.message || err.message || 'Error al actualizar la prioridad';
+      setError(errorMessage);
+      console.error('Mensaje de error:', errorMessage);
     } finally {
       setUpdating(false);
     }
@@ -342,15 +349,33 @@ const ReporteDetail = () => {
       )}
 
       {showPrioridadModal && (
-        <div className="modal-overlay" onClick={() => setShowPrioridadModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowPrioridadModal(false);
+          setNuevaPrioridad('');
+          setError('');
+        }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>{reporte.prioridad ? 'Cambiar Prioridad' : 'Establecer Prioridad'}</h2>
             <div className="modal-form">
+              {error && (
+                <div className="error-message" style={{ 
+                  backgroundColor: '#ffebee', 
+                  color: '#c62828', 
+                  padding: '10px', 
+                  borderRadius: '5px', 
+                  marginBottom: '15px' 
+                }}>
+                  {error}
+                </div>
+              )}
               <div className="form-group">
                 <label>Prioridad *</label>
                 <select
                   value={nuevaPrioridad}
-                  onChange={(e) => setNuevaPrioridad(e.target.value)}
+                  onChange={(e) => {
+                    setNuevaPrioridad(e.target.value);
+                    setError('');
+                  }}
                   style={{ width: '100%', padding: '8px' }}
                 >
                   <option value="">Seleccione una prioridad</option>
@@ -365,6 +390,7 @@ const ReporteDetail = () => {
                   onClick={() => {
                     setShowPrioridadModal(false);
                     setNuevaPrioridad('');
+                    setError('');
                   }}
                   className="button secondary"
                   disabled={updating}
