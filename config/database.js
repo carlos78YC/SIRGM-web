@@ -4,7 +4,27 @@ require('dotenv').config();
 
 // Forzar que Node.js prefiera IPv4 sobre IPv6
 // Esto evita problemas de conectividad en entornos como Render
-dns.setDefaultResultOrder('ipv4first');
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {
+  // Si no está disponible en esta versión de Node.js, continuar
+}
+
+// Función de lookup personalizada que FUERZA IPv4
+function ipv4Lookup(hostname, options, callback) {
+  // Siempre forzar familia IPv4 - esto es crítico para Render
+  dns.lookup(hostname, { 
+    family: 4,  // Solo IPv4
+    all: false  // Solo la primera dirección
+  }, (err, address, family) => {
+    if (err) {
+      // Si falla IPv4, devolver el error
+      return callback(err);
+    }
+    // Asegurar que siempre devolvamos familia 4 (IPv4)
+    callback(null, address, 4);
+  });
+}
 
 // Función para crear la configuración del pool
 function createPoolConfig() {
@@ -30,6 +50,8 @@ function createPoolConfig() {
         password: password,
         // Forzar IPv4 - CRÍTICO para Render
         family: 4,
+        // Lookup personalizado que fuerza IPv4
+        lookup: ipv4Lookup,
         // SSL obligatorio para Supabase
         ssl: {
           rejectUnauthorized: false,
@@ -47,6 +69,8 @@ function createPoolConfig() {
       console.warn('⚠️ Advertencia: No se pudo parsear DATABASE_URL, usando connectionString directamente');
       return {
         connectionString: process.env.DATABASE_URL,
+        family: 4,
+        lookup: ipv4Lookup,
         ssl: {
           rejectUnauthorized: false,
           require: true
@@ -67,6 +91,8 @@ function createPoolConfig() {
     client_encoding: 'UTF8',
     // Forzar IPv4 para evitar problemas de conectividad
     family: 4,
+    // Lookup personalizado que fuerza IPv4
+    lookup: ipv4Lookup,
     // Timeout de conexión
     connectionTimeoutMillis: 10000,
   };
