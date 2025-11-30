@@ -1,59 +1,89 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Verificar que las variables de entorno estén definidas
-const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName].trim() === '');
-
-if (missingVars.length > 0) {
-  console.error('❌ ERROR: Faltan variables de entorno requeridas:');
-  missingVars.forEach(varName => {
-    console.error(`   - ${varName}`);
-  });
-  console.error('\n💡 Solución: Configura las variables de entorno en Render:');
-  console.error('   1. Ve a Render Dashboard → Tu servicio → Settings → Environment');
-  console.error('   2. Agrega todas las variables requeridas');
-  console.error('   3. Consulta VERIFICAR_CONFIG.md para más información.\n');
-  
-  // Mostrar qué valores tienen las variables (sin mostrar passwords completos)
-  console.error('📋 Variables actuales:');
-  requiredEnvVars.forEach(varName => {
-    const value = process.env[varName];
-    if (varName === 'DB_PASSWORD') {
-      console.error(`   ${varName}: ${value ? '***configurada***' : '❌ NO CONFIGURADA'}`);
-    } else {
-      console.error(`   ${varName}: ${value || '❌ NO CONFIGURADA'}`);
+// Función para crear la configuración del pool
+function createPoolConfig() {
+  // Opción 1: Usar DATABASE_URL (preferido para Supabase)
+  if (process.env.DATABASE_URL) {
+    const config = {
+      connectionString: process.env.DATABASE_URL,
+      // SSL obligatorio para Supabase
+      ssl: {
+        rejectUnauthorized: false,
+        require: true
+      },
+      // Forzar IPv4 para evitar problemas de conectividad
+      connectionTimeoutMillis: 10000,
+    };
+    
+    // Forzar IPv4 en la URL de conexión
+    const url = new URL(process.env.DATABASE_URL);
+    if (url.hostname && !url.hostname.includes('localhost')) {
+      // Configurar para usar IPv4
+      config.family = 4;
     }
-  });
-  console.error('');
+    
+    return config;
+  }
+  
+  // Opción 2: Usar variables individuales (fallback)
+  const poolConfig = {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT) || 5432,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    // Asegurar que la conexión use UTF-8
+    client_encoding: 'UTF8',
+    // Forzar IPv4 para evitar problemas de conectividad
+    family: 4,
+    // Timeout de conexión
+    connectionTimeoutMillis: 10000,
+  };
+
+  // SSL obligatorio para Supabase o bases de datos remotas
+  if (process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co')) {
+    poolConfig.ssl = {
+      rejectUnauthorized: false,
+      require: true
+    };
+  } else if (process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production') {
+    // En producción, siempre usar SSL
+    poolConfig.ssl = {
+      rejectUnauthorized: false,
+      require: true
+    };
+  }
+
+  return poolConfig;
 }
 
-// Configuración del pool
-const poolConfig = {
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT) || 5432,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  // Asegurar que la conexión use UTF-8
-  client_encoding: 'UTF8',
-  // Forzar IPv4 para evitar problemas de conectividad
-  family: 4,
-  // Timeout de conexión
-  connectionTimeoutMillis: 10000,
-};
+// Verificar variables de entorno
+const hasDatabaseUrl = !!process.env.DATABASE_URL;
+const hasIndividualVars = process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD;
 
-// SSL solo si es necesario (para Supabase o bases de datos remotas)
-// Si DB_HOST contiene 'supabase.co', habilitar SSL
-if (process.env.DB_HOST && process.env.DB_HOST.includes('supabase.co')) {
-  poolConfig.ssl = {
-    rejectUnauthorized: false
-  };
-} else if (process.env.DB_SSL === 'true') {
-  // Permitir habilitar SSL manualmente
-  poolConfig.ssl = {
-    rejectUnauthorized: false
-  };
+if (!hasDatabaseUrl && !hasIndividualVars) {
+  console.error('❌ ERROR: No se encontraron variables de entorno para la base de datos.');
+  console.error('');
+  console.error('💡 Configura UNA de estas opciones:');
+  console.error('');
+  console.error('   Opción 1 (Recomendado): DATABASE_URL');
+  console.error('   - Obténla desde: Supabase Dashboard → Settings → Database → Connection string');
+  console.error('   - Formato: postgresql://postgres:[PASSWORD]@db.xxxxx.supabase.co:5432/postgres');
+  console.error('');
+  console.error('   Opción 2: Variables individuales');
+  console.error('   - DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD');
+  console.error('');
+  console.error('📝 Consulta VERIFICAR_CONFIG.md para más información.\n');
+}
+
+// Crear configuración del pool
+let poolConfig;
+try {
+  poolConfig = createPoolConfig();
+} catch (error) {
+  console.error('❌ ERROR al configurar la conexión:', error.message);
+  process.exit(1);
 }
 
 const pool = new Pool(poolConfig);
@@ -68,39 +98,71 @@ pool.on('error', (err) => {
 async function testConnection() {
   try {
     const client = await pool.connect();
-    const result = await client.query('SELECT NOW()');
+    const result = await client.query('SELECT NOW(), version()');
     client.release();
+    
     console.log('✅ Conexión a PostgreSQL exitosa');
     console.log(`   📅 Hora del servidor: ${result.rows[0].now}`);
+    console.log(`   🔌 Versión PostgreSQL: ${result.rows[0].version.split(',')[0]}`);
+    
+    // Verificar que SSL esté activo
+    try {
+      const sslResult = await pool.query('SHOW ssl');
+      console.log(`   🔒 SSL: ${sslResult.rows[0]?.ssl || 'Verificado'}`);
+    } catch (e) {
+      // Ignorar si no se puede verificar SSL
+    }
+    
     return true;
   } catch (err) {
     console.error('❌ Error al conectar con PostgreSQL:');
     console.error(`   Mensaje: ${err.message}`);
+    console.error(`   Código: ${err.code || 'N/A'}`);
     
     // Mensajes de ayuda según el tipo de error
     if (err.code === 'ENOTFOUND') {
-      console.error('   💡 El host no se puede resolver. Verifica DB_HOST en tu archivo .env');
+      console.error('   💡 El host no se puede resolver. Verifica:');
+      console.error('      - Que el host en DATABASE_URL o DB_HOST sea correcto');
+      console.error('      - Que el proyecto de Supabase esté activo (no pausado)');
     } else if (err.code === 'ECONNREFUSED') {
       console.error('   💡 La conexión fue rechazada. Verifica:');
-      console.error('      - Que el servidor PostgreSQL esté corriendo');
-      console.error('      - Que DB_PORT sea correcto');
+      console.error('      - Que el puerto sea correcto (5432 para Supabase)');
       console.error('      - Que el firewall permita la conexión');
+    } else if (err.code === 'ENETUNREACH') {
+      console.error('   💡 Error de red. Verifica:');
+      console.error('      - Que el proyecto de Supabase esté activo');
+      console.error('      - Que las credenciales sean correctas');
+      console.error('      - Que no haya problemas de conectividad');
     } else if (err.code === '28P01') {
-      console.error('   💡 Error de autenticación. Verifica DB_USER y DB_PASSWORD');
+      console.error('   💡 Error de autenticación. Verifica:');
+      console.error('      - DB_USER o usuario en DATABASE_URL');
+      console.error('      - DB_PASSWORD o contraseña en DATABASE_URL');
     } else if (err.code === '3D000') {
       console.error('   💡 La base de datos no existe. Verifica DB_NAME');
-    } else if (err.code === 'ETIMEDOUT') {
+    } else if (err.code === 'ETIMEDOUT' || err.message.includes('timeout')) {
       console.error('   💡 Timeout de conexión. Verifica:');
-      console.error('      - Que el host sea accesible');
-      console.error('      - Tu conexión a internet');
+      console.error('      - Que el host sea accesible desde Render');
+      console.error('      - Que el proyecto de Supabase esté activo');
+    } else if (err.message.includes('SSL') || err.message.includes('TLS')) {
+      console.error('   💡 Error de SSL. Verifica que SSL esté configurado correctamente.');
     }
+    
+    // Mostrar qué variables están configuradas (sin mostrar valores completos)
+    console.error('');
+    console.error('📋 Variables de entorno detectadas:');
+    console.error(`   DATABASE_URL: ${process.env.DATABASE_URL ? '✅ Configurada' : '❌ No configurada'}`);
+    console.error(`   DB_HOST: ${process.env.DB_HOST || '❌ No configurada'}`);
+    console.error(`   DB_USER: ${process.env.DB_USER ? '✅ Configurada' : '❌ No configurada'}`);
+    console.error(`   DB_PASSWORD: ${process.env.DB_PASSWORD ? '✅ Configurada' : '❌ No configurada'}`);
+    console.error(`   DB_NAME: ${process.env.DB_NAME || '❌ No configurada'}`);
+    console.error('');
     
     return false;
   }
 }
 
-// Probar conexión al cargar el módulo (solo si todas las variables están definidas)
-if (missingVars.length === 0) {
+// Probar conexión al cargar el módulo (solo si hay variables configuradas)
+if (hasDatabaseUrl || hasIndividualVars) {
   testConnection().catch(() => {
     // El error ya se mostró en testConnection
   });
@@ -108,8 +170,3 @@ if (missingVars.length === 0) {
 
 module.exports = pool;
 module.exports.testConnection = testConnection;
-
-
-
-
-
