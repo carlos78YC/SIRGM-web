@@ -143,9 +143,15 @@ const ReportesTable = () => {
                   </td>
                   <td>{reporte.ubicacion || '-'}</td>
                   <td>
-                    <span className={`badge ${getPrioridadBadgeClass(reporte.prioridad)}`}>
-                      {reporte.prioridad}
-                    </span>
+                    {reporte.prioridad ? (
+                      <span className={`badge ${getPrioridadBadgeClass(reporte.prioridad)}`}>
+                        {reporte.prioridad}
+                      </span>
+                    ) : (
+                      <span className="badge badge-default" style={{ backgroundColor: '#9E9E9E' }}>
+                        Sin prioridad
+                      </span>
+                    )}
                   </td>
                   <td>
                     <span className={`badge ${getEstadoBadgeClass(reporte.estado)}`}>
@@ -172,6 +178,8 @@ const ReportesTable = () => {
 };
 
 export default ReportesTable;
+
+
 
 
 

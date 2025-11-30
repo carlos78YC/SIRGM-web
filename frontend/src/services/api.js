@@ -110,10 +110,18 @@ export const reporteService = {
     return response.data;
   },
   
-  updateEstado: async (id, estado, observaciones = null) => {
+  updateEstado: async (id, estado, observaciones = null, prioridad = null) => {
     const response = await api.put(`/reportes/${id}/estado`, {
       estado,
       observaciones,
+      prioridad, // Incluir prioridad si se proporciona
+    });
+    return response.data;
+  },
+  
+  updatePrioridad: async (id, prioridad) => {
+    const response = await api.put(`/reportes/${id}/prioridad`, {
+      prioridad,
     });
     return response.data;
   },

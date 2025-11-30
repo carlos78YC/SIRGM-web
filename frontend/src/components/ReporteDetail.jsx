@@ -13,7 +13,9 @@ const ReporteDetail = () => {
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
   const [showEstadoModal, setShowEstadoModal] = useState(false);
+  const [showPrioridadModal, setShowPrioridadModal] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState('');
+  const [nuevaPrioridad, setNuevaPrioridad] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
   useEffect(() => {
@@ -40,12 +42,37 @@ const ReporteDetail = () => {
 
     try {
       setUpdating(true);
-      await reporteService.updateEstado(id, nuevoEstado, observaciones || null);
+      // Si el reporte no tiene prioridad, requerirla
+      const prioridadAEnviar = !reporte.prioridad && nuevaPrioridad ? nuevaPrioridad : null;
+      await reporteService.updateEstado(id, nuevoEstado, observaciones || null, prioridadAEnviar);
       await loadReporte();
       setShowEstadoModal(false);
       setObservaciones('');
+      setNuevaPrioridad('');
     } catch (err) {
-      setError('Error al actualizar el estado');
+      if (err.response?.data?.requiresPrioridad) {
+        setError('Este reporte requiere establecer una prioridad antes de actualizar el estado');
+      } else {
+        setError('Error al actualizar el estado');
+      }
+      console.error(err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleUpdatePrioridad = async () => {
+    if (!nuevaPrioridad) return;
+
+    try {
+      setUpdating(true);
+      await reporteService.updatePrioridad(id, nuevaPrioridad);
+      await loadReporte();
+      setShowPrioridadModal(false);
+      setNuevaPrioridad('');
+      setError('');
+    } catch (err) {
+      setError('Error al actualizar la prioridad');
       console.error(err);
     } finally {
       setUpdating(false);
@@ -124,9 +151,26 @@ const ReporteDetail = () => {
               <span className={`badge ${getEstadoBadgeClass(reporte.estado)}`}>
                 {reporte.estado.replace('_', ' ')}
               </span>
-              <span className={`badge ${getPrioridadBadgeClass(reporte.prioridad)}`}>
-                {reporte.prioridad}
-              </span>
+              {reporte.prioridad ? (
+                <span 
+                  className={`badge ${getPrioridadBadgeClass(reporte.prioridad)}`}
+                  style={{ cursor: canUpdateEstado ? 'pointer' : 'default' }}
+                  onClick={canUpdateEstado ? () => {
+                    setNuevaPrioridad(reporte.prioridad);
+                    setShowPrioridadModal(true);
+                  } : undefined}
+                  title={canUpdateEstado ? 'Click para cambiar prioridad' : ''}
+                >
+                  {reporte.prioridad}
+                </span>
+              ) : (
+                <span className="badge badge-default" style={{ backgroundColor: '#9E9E9E', cursor: canUpdateEstado ? 'pointer' : 'default' }} onClick={canUpdateEstado ? () => {
+                  setNuevaPrioridad('');
+                  setShowPrioridadModal(true);
+                } : undefined}>
+                  Sin prioridad {canUpdateEstado && '(Click para establecer)'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -204,7 +248,20 @@ const ReporteDetail = () => {
         {canUpdateEstado && (
           <div className="detail-actions">
             <button
-              onClick={() => setShowEstadoModal(true)}
+              onClick={() => {
+                setNuevaPrioridad(reporte.prioridad || '');
+                setShowPrioridadModal(true);
+              }}
+              className="action-button warning"
+              style={{ backgroundColor: '#FF9800', marginRight: '10px' }}
+            >
+              {reporte.prioridad ? 'Cambiar Prioridad' : 'Establecer Prioridad'}
+            </button>
+            <button
+              onClick={() => {
+                setNuevoEstado(reporte.estado);
+                setShowEstadoModal(true);
+              }}
               className="action-button primary"
             >
               Cambiar Estado
@@ -218,6 +275,25 @@ const ReporteDetail = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>Cambiar Estado</h2>
             <div className="modal-form">
+              {!reporte.prioridad && (
+                <div className="form-group" style={{ backgroundColor: '#fff3cd', padding: '10px', borderRadius: '5px', marginBottom: '15px' }}>
+                  <label style={{ color: '#856404', fontWeight: 'bold' }}>
+                    ⚠️ Este reporte no tiene prioridad asignada
+                  </label>
+                  <select
+                    value={nuevaPrioridad}
+                    onChange={(e) => setNuevaPrioridad(e.target.value)}
+                    required
+                    style={{ marginTop: '5px', width: '100%', padding: '8px' }}
+                  >
+                    <option value="">Seleccione una prioridad *</option>
+                    <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                    <option value="urgente">Urgente</option>
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label>Nuevo Estado:</label>
                 <select
@@ -243,7 +319,10 @@ const ReporteDetail = () => {
               </div>
               <div className="modal-actions">
                 <button
-                  onClick={() => setShowEstadoModal(false)}
+                  onClick={() => {
+                    setShowEstadoModal(false);
+                    setNuevaPrioridad('');
+                  }}
                   className="button secondary"
                   disabled={updating}
                 >
@@ -252,9 +331,52 @@ const ReporteDetail = () => {
                 <button
                   onClick={handleUpdateEstado}
                   className="button primary"
-                  disabled={updating || !nuevoEstado}
+                  disabled={updating || !nuevoEstado || (!reporte.prioridad && !nuevaPrioridad)}
                 >
                   {updating ? 'Actualizando...' : 'Actualizar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrioridadModal && (
+        <div className="modal-overlay" onClick={() => setShowPrioridadModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>{reporte.prioridad ? 'Cambiar Prioridad' : 'Establecer Prioridad'}</h2>
+            <div className="modal-form">
+              <div className="form-group">
+                <label>Prioridad *</label>
+                <select
+                  value={nuevaPrioridad}
+                  onChange={(e) => setNuevaPrioridad(e.target.value)}
+                  style={{ width: '100%', padding: '8px' }}
+                >
+                  <option value="">Seleccione una prioridad</option>
+                  <option value="baja">Baja</option>
+                  <option value="media">Media</option>
+                  <option value="alta">Alta</option>
+                  <option value="urgente">Urgente</option>
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button
+                  onClick={() => {
+                    setShowPrioridadModal(false);
+                    setNuevaPrioridad('');
+                  }}
+                  className="button secondary"
+                  disabled={updating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleUpdatePrioridad}
+                  className="button primary"
+                  disabled={updating || !nuevaPrioridad}
+                >
+                  {updating ? 'Actualizando...' : (reporte.prioridad ? 'Cambiar Prioridad' : 'Establecer Prioridad')}
                 </button>
               </div>
             </div>
