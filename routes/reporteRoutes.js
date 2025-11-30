@@ -28,6 +28,23 @@ router.post(
 // GET /reportes - Obtener todos los reportes
 router.get('/', reporteController.getReportes);
 
+// IMPORTANTE: Las rutas más específicas deben ir ANTES de las genéricas
+// PUT /reportes/:id/estado - Actualizar estado del reporte
+router.put(
+  '/:id/estado',
+  updateEstadoValidator,
+  handleValidationErrors,
+  reporteController.updateEstado
+);
+
+// PUT /reportes/:id/prioridad - Establecer prioridad del reporte
+router.put(
+  '/:id/prioridad',
+  updatePrioridadValidator,
+  handleValidationErrors,
+  reporteController.updatePrioridad
+);
+
 // GET /reportes/:id - Obtener un reporte por ID
 router.get(
   '/:id',
@@ -43,22 +60,6 @@ router.put(
   updateReporteValidator,
   handleValidationErrors,
   reporteController.updateReporte
-);
-
-// PUT /reportes/:id/estado - Actualizar estado del reporte
-router.put(
-  '/:id/estado',
-  updateEstadoValidator,
-  handleValidationErrors,
-  reporteController.updateEstado
-);
-
-// PUT /reportes/:id/prioridad - Establecer prioridad del reporte
-router.put(
-  '/:id/prioridad',
-  updatePrioridadValidator,
-  handleValidationErrors,
-  reporteController.updatePrioridad
 );
 
 // DELETE /reportes/:id - Eliminar reporte
