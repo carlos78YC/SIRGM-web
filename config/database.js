@@ -1,29 +1,59 @@
 const { Pool } = require('pg');
+const dns = require('dns');
 require('dotenv').config();
+
+// Forzar que Node.js prefiera IPv4 sobre IPv6
+// Esto evita problemas de conectividad en entornos como Render
+dns.setDefaultResultOrder('ipv4first');
 
 // Función para crear la configuración del pool
 function createPoolConfig() {
   // Opción 1: Usar DATABASE_URL (preferido para Supabase)
   if (process.env.DATABASE_URL) {
-    const config = {
-      connectionString: process.env.DATABASE_URL,
-      // SSL obligatorio para Supabase
-      ssl: {
-        rejectUnauthorized: false,
-        require: true
-      },
-      // Forzar IPv4 para evitar problemas de conectividad
-      connectionTimeoutMillis: 10000,
-    };
-    
-    // Forzar IPv4 en la URL de conexión
-    const url = new URL(process.env.DATABASE_URL);
-    if (url.hostname && !url.hostname.includes('localhost')) {
-      // Configurar para usar IPv4
-      config.family = 4;
+    try {
+      // Parsear la URL para extraer componentes y forzar IPv4
+      const dbUrl = new URL(process.env.DATABASE_URL);
+      
+      // Extraer credenciales de la URL
+      const username = dbUrl.username;
+      const password = dbUrl.password;
+      const hostname = dbUrl.hostname;
+      const port = parseInt(dbUrl.port) || 5432;
+      const database = dbUrl.pathname.replace(/^\//, '') || 'postgres';
+      
+      // Configuración individual para forzar IPv4
+      const config = {
+        host: hostname,
+        port: port,
+        database: database,
+        user: username,
+        password: password,
+        // Forzar IPv4 - CRÍTICO para Render
+        family: 4,
+        // SSL obligatorio para Supabase
+        ssl: {
+          rejectUnauthorized: false,
+          require: true
+        },
+        // Timeout de conexión
+        connectionTimeoutMillis: 10000,
+        // Asegurar UTF-8
+        client_encoding: 'UTF8'
+      };
+      
+      return config;
+    } catch (error) {
+      // Si hay error al parsear, intentar con connectionString directamente
+      console.warn('⚠️ Advertencia: No se pudo parsear DATABASE_URL, usando connectionString directamente');
+      return {
+        connectionString: process.env.DATABASE_URL,
+        ssl: {
+          rejectUnauthorized: false,
+          require: true
+        },
+        connectionTimeoutMillis: 10000,
+      };
     }
-    
-    return config;
   }
   
   // Opción 2: Usar variables individuales (fallback)
