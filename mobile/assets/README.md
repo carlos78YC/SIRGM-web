@@ -38,3 +38,4 @@ Para desarrollo rápido, puedes crear imágenes simples de 1024x1024 px con un c
 
 
 
+

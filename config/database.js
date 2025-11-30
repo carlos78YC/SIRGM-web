@@ -1,14 +1,18 @@
 const { Pool } = require('pg');
 const dns = require('dns');
+const { promisify } = require('util');
 require('dotenv').config();
 
-// Forzar que Node.js prefiera IPv4 sobre IPv6
+// Forzar que Node.js prefiera IPv4 sobre IPv6 a nivel del sistema
 // Esto evita problemas de conectividad en entornos como Render
 try {
   dns.setDefaultResultOrder('ipv4first');
 } catch (e) {
   // Si no está disponible en esta versión de Node.js, continuar
 }
+
+// Configurar variables de entorno para forzar IPv4
+process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --dns-result-order=ipv4first';
 
 // Función de lookup personalizada que FUERZA IPv4
 function ipv4Lookup(hostname, options, callback) {
@@ -18,8 +22,13 @@ function ipv4Lookup(hostname, options, callback) {
     all: false  // Solo la primera dirección
   }, (err, address, family) => {
     if (err) {
-      // Si falla IPv4, devolver el error
-      return callback(err);
+      // Si falla IPv4, intentar una vez más
+      return dns.lookup(hostname, { family: 4, all: false }, (err2, address2, family2) => {
+        if (err2) {
+          return callback(err2);
+        }
+        callback(null, address2, 4);
+      });
     }
     // Asegurar que siempre devolvamos familia 4 (IPv4)
     callback(null, address, 4);

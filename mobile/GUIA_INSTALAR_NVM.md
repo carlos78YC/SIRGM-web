@@ -103,3 +103,4 @@ Pero recuerda: Expo no funcionará correctamente con Node.js 24.x debido al erro
 
 
 
+

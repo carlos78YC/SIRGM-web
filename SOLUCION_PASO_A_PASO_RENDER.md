@@ -179,3 +179,4 @@ Antes de hacer deploy, verifica:
 
 **Después de seguir estos pasos, el error debería desaparecer.** Si persiste, comparte qué mensajes aparecen en los logs después del re-deploy.
 
+

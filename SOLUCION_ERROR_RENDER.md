@@ -137,3 +137,4 @@ Si el error persiste, verifica en los logs:
 
 Una vez que corrijas las variables y re-deployes, el error debería desaparecer. 🚀
 
+
