@@ -43,12 +43,33 @@ app.use('/reportes', reporteRoutes);
 app.use('/upload', uploadRoutes);
 app.use('/admin', adminRoutes);
 
+// Ruta raíz - Información del servidor
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: '🚀 SIRGM Backend API está funcionando correctamente',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    endpoints: {
+      auth: '/auth',
+      reportes: '/reportes',
+      upload: '/upload',
+      admin: '/admin',
+      health: '/health'
+    },
+    documentation: 'Consulta API_EXAMPLES.md para ver ejemplos de uso'
+  });
+});
+
 // Ruta de salud
 app.get('/health', (req, res) => {
   res.json({
     success: true,
     message: 'Servidor funcionando correctamente',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
