@@ -131,34 +131,66 @@ const updateEstado = async (req, res, next) => {
     const { id } = req.params;
     const { estado, observaciones, prioridad } = req.body;
 
+    console.log('[DEBUG updateEstado] ID:', id);
+    console.log('[DEBUG updateEstado] Estado recibido:', estado);
+    console.log('[DEBUG updateEstado] Prioridad recibida:', prioridad);
+    console.log('[DEBUG updateEstado] Observaciones recibidas:', observaciones);
+    console.log('[DEBUG updateEstado] Usuario rol:', req.user?.rol);
+
     // Verificar que el reporte existe
     const reporte = await Reporte.findById(id);
     if (!reporte) {
+      console.log('[DEBUG updateEstado] Reporte no encontrado');
       return res.status(404).json({
         success: false,
         message: 'Reporte no encontrado'
       });
     }
 
+    console.log('[DEBUG updateEstado] Reporte encontrado, prioridad actual:', reporte.prioridad);
+    console.log('[DEBUG updateEstado] Estado actual:', reporte.estado);
+
     // Verificar permisos: solo admin y mantenimiento pueden actualizar estado
     if (req.user.rol !== 'admin' && req.user.rol !== 'mantenimiento') {
+      console.log('[DEBUG updateEstado] Sin permisos, rol:', req.user.rol);
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para actualizar el estado del reporte'
       });
     }
 
-    // Si el reporte no tiene prioridad, se requiere establecerla
-    if (!reporte.prioridad && !prioridad) {
+    // Validar que el estado sea válido
+    const estadosValidos = ['pendiente', 'en_proceso', 'resuelto', 'cerrado'];
+    if (!estado || !estadosValidos.includes(estado)) {
+      console.log('[DEBUG updateEstado] Estado inválido:', estado);
       return res.status(400).json({
         success: false,
-        message: 'Este reporte requiere que se establezca una prioridad antes de actualizar el estado',
-        requiresPrioridad: true
+        message: `El estado debe ser uno de: ${estadosValidos.join(', ')}`
       });
     }
 
+    // Si el reporte no tiene prioridad y no se proporciona una, permitir el cambio de estado
+    // pero sugerir establecer la prioridad (ya no es obligatorio)
+    if (!reporte.prioridad && !prioridad) {
+      console.log('[DEBUG updateEstado] Reporte sin prioridad, permitiendo cambio de estado');
+    }
+
+    // Si se proporciona prioridad, validarla
+    if (prioridad) {
+      const prioridadesValidas = ['baja', 'media', 'alta', 'urgente'];
+      if (!prioridadesValidas.includes(prioridad)) {
+        console.log('[DEBUG updateEstado] Prioridad inválida:', prioridad);
+        return res.status(400).json({
+          success: false,
+          message: `La prioridad debe ser una de: ${prioridadesValidas.join(', ')}`
+        });
+      }
+    }
+
     // Actualizar estado (y prioridad si se proporciona)
+    console.log('[DEBUG updateEstado] Actualizando estado...');
     const reporteActualizado = await Reporte.updateEstado(id, estado, observaciones, prioridad);
+    console.log('[DEBUG updateEstado] Estado actualizado exitosamente');
 
     res.json({
       success: true,
@@ -166,6 +198,8 @@ const updateEstado = async (req, res, next) => {
       data: reporteActualizado
     });
   } catch (error) {
+    console.error('[DEBUG updateEstado] Error:', error.message);
+    console.error('[DEBUG updateEstado] Stack:', error.stack);
     next(error);
   }
 };

@@ -29,6 +29,8 @@ const updateEstadoValidator = [
     .isInt()
     .withMessage('El ID debe ser un número entero'),
   body('estado')
+    .notEmpty()
+    .withMessage('El estado es requerido')
     .isIn(['pendiente', 'en_proceso', 'resuelto', 'cerrado'])
     .withMessage('El estado debe ser: pendiente, en_proceso, resuelto o cerrado'),
   body('observaciones')
