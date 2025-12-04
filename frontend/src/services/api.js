@@ -111,11 +111,24 @@ export const reporteService = {
   },
   
   updateEstado: async (id, estado, observaciones = null, prioridad = null) => {
-    const response = await api.put(`/reportes/${id}/estado`, {
+    // Construir el body solo con los campos que tienen valor
+    const body = {
       estado,
-      observaciones,
-      prioridad, // Incluir prioridad si se proporciona
-    });
+    };
+    
+    // Solo incluir observaciones si tienen valor
+    if (observaciones) {
+      body.observaciones = observaciones;
+    }
+    
+    // Solo incluir prioridad si se proporciona (no enviar null)
+    if (prioridad) {
+      body.prioridad = prioridad;
+    }
+    
+    console.log('[DEBUG API] Actualizando estado:', { id, body });
+    
+    const response = await api.put(`/reportes/${id}/estado`, body);
     return response.data;
   },
   

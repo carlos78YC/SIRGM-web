@@ -42,20 +42,39 @@ const ReporteDetail = () => {
 
     try {
       setUpdating(true);
-      // Si el reporte no tiene prioridad, requerirla
-      const prioridadAEnviar = !reporte.prioridad && nuevaPrioridad ? nuevaPrioridad : null;
+      setError('');
+      // Si el reporte no tiene prioridad y se seleccionó una nueva, enviarla
+      // Si el reporte ya tiene prioridad, no enviar prioridad (null)
+      const prioridadAEnviar = !reporte.prioridad && nuevaPrioridad ? nuevaPrioridad : (reporte.prioridad ? null : null);
+      
+      console.log('[DEBUG Frontend] Actualizando estado:', {
+        id,
+        estado: nuevoEstado,
+        observaciones: observaciones || null,
+        prioridad: prioridadAEnviar,
+        reporteTienePrioridad: reporte.prioridad
+      });
+      
       await reporteService.updateEstado(id, nuevoEstado, observaciones || null, prioridadAEnviar);
       await loadReporte();
       setShowEstadoModal(false);
       setObservaciones('');
       setNuevaPrioridad('');
+      setError('');
     } catch (err) {
+      console.error('[DEBUG Frontend] Error completo:', err);
+      console.error('[DEBUG Frontend] Error response:', err.response);
+      
+      const errorMessage = err.response?.data?.message || 
+                          err.response?.data?.errors?.[0]?.msg || 
+                          err.message || 
+                          'Error al actualizar el estado';
+      
       if (err.response?.data?.requiresPrioridad) {
         setError('Este reporte requiere establecer una prioridad antes de actualizar el estado');
       } else {
-        setError('Error al actualizar el estado');
+        setError(errorMessage);
       }
-      console.error(err);
     } finally {
       setUpdating(false);
     }
